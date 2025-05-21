@@ -1,0 +1,19 @@
+{
+  "name": "ft_transcendence",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "frontend": "pnpm -F \"frontend\"",
+    "backend": "pnpm -F \"backend\"",
+    "db": "pnpm -F \"database\""
+  },
+  "engines": {
+    "pnpm": ">=9.15.0",
+    "npm": "please use pnpm"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
