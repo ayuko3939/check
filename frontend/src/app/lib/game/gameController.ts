@@ -1,5 +1,5 @@
 import type { PongSocketClient } from "@/lib/game/webSocketClient";
-import type { GameState, PlayerSide } from "src/types/game";
+import type { GameState, PlayerSide } from "src/types/ui";
 
 import { PongRenderer } from "./gameRenderer";
 

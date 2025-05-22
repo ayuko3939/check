@@ -1,4 +1,4 @@
-import type { GameState } from "src/types/game";
+import type { GameState } from "src/types/ui";
 
 export class PongRenderer {
   private ctx: CanvasRenderingContext2D;
