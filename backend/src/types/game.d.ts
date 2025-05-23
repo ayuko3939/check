@@ -9,7 +9,7 @@ import type {
   ChatMessage,
   ClientMessage,
   PlayerSide
-} from '../../../shared/types/game';
+} from "shared/types";
 
 // ===========================================
 // ゲームルーム管理
@@ -45,18 +45,6 @@ export interface MessageContext {
 
 // メッセージハンドラー関数の型
 export type MessageHandler = (message: ClientMessage, context: MessageContext) => void;
-
-// ===========================================
-// ゲームエンジン用
-// ===========================================
-
-// 衝突判定の結果
-export interface CollisionInfo {
-  hasCollision: boolean;        // 衝突が発生したか
-  type: 'paddle' | 'wall' | 'goal' | 'none';  // 衝突の種類
-  shouldReflectX: boolean;      // X方向の反射が必要か
-  shouldReflectY: boolean;      // Y方向の反射が必要か
-}
 
 // ===========================================
 // ユーティリティ型

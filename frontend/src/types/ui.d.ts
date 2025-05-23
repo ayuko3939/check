@@ -8,7 +8,7 @@ import type {
   GameResult, 
   PlayerSide,
   GameSettings 
-} from '../../../shared/types/game';
+} from "./shared/types";
 
 // ===========================================
 // React Hook用の型

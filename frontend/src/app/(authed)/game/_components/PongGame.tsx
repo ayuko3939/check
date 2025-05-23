@@ -1,152 +1,394 @@
-// ===========================================
-// メインゲームコンポーネント（統合・分割版）
-// ===========================================
-
 "use client";
 
-import { useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { PADDLE } from '../../../../../shared/types/constants';
-import type { PongGameProps } from '../../../../types/ui';
+import type {
+  ChatMessage,
+  GameResult,
+  GameSettings,
+  GameState,
+  PlayerSide,
+} from "../../../../types/shared/types";
+import { CANVAS, BALL, PADDLE, GAME } from "../../../../types/shared/constants";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { PongController } from "@/lib/game/gameController";
+import { PongSocketClient } from "@/lib/game/webSocketClient";
 
-// 分割されたコンポーネントをインポート
-import { useGame } from './hooks/useGame';
-import GameCanvas from './GameCanvas';
-import GameSettings from './GameSettings';
-import GameChat from './GameChat';
-import SurrenderDialog from './SurrenderDialog';
-import GameResult from './GameResult';
-import WaitingScreen from './WaitingScreen';
-import styles from '../game.module.css';
+import styles from "./game.module.css";
 
-interface Props {
-  roomId?: string;
-}
+const initialGameState: GameState = {
+  ball: {
+    x: CANVAS.WIDTH / 2,
+    y: CANVAS.HEIGHT / 2,
+    dx: BALL.DEFAULT_SPEED * (Math.random() > 0.5 ? 1 : -1),
+    dy: BALL.DEFAULT_SPEED * (Math.random() > 0.5 ? 1 : -1),
+    radius: BALL.RADIUS,
+  },
+  paddleLeft: {
+    x: PADDLE.LEFT_X,
+    y: CANVAS.HEIGHT / 2 - PADDLE.HEIGHT / 2,
+    width: PADDLE.WIDTH,
+    height: PADDLE.HEIGHT,
+  },
+  paddleRight: {
+    x: PADDLE.RIGHT_X,
+    y: CANVAS.HEIGHT / 2 - PADDLE.HEIGHT / 2,
+    width: PADDLE.WIDTH,
+    height: PADDLE.HEIGHT,
+  },
+  score: {
+    left: 0,
+    right: 0,
+  },
+  status: 'waiting',
+  winner: null,
+  winningScore: GAME.DEFAULT_WINNING_SCORE,
+};
 
-export default function PongGame({ roomId }: Props) {
-  const { data: session } = useSession();
-  
-  // カスタムフックでゲーム状態を管理
-  const game = useGame();
+const PongGame = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [playerSide, setPlayerSide] = useState<PlayerSide>(null);
+  const [gameState, setGameState] = useState<GameState>(initialGameState);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
 
-  // WebSocket接続開始
+  // ゲーム設定関連の状態
+  const [showSettings, setShowSettings] = useState(false);
+  const [gameSettings, setGameSettings] = useState<GameSettings>({
+    ballSpeed: BALL.DEFAULT_SPEED,
+    winningScore: GAME.DEFAULT_WINNING_SCORE,
+  });
+  const [settingsConfirmed, setSettingsConfirmed] = useState(false);
+
+  // ゲーム結果表示用の状態
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [gameResult, setGameResult] = useState<GameResult | null>(null);
+
+  const router = useRouter();
+  const controllerRef = useRef<PongController | null>(null);
+  const socketClientRef = useRef<PongSocketClient | null>(null);
+
   useEffect(() => {
-    const wsUrl = roomId ? `/api/ws-proxy/${roomId}` : '/api/ws-proxy';
-    game.connect(wsUrl);
-    
+    const wsUrl = "/api/ws-proxy";
+
+    const socketClient = new PongSocketClient({
+      onInit: (side, state) => {
+        setPlayerSide(side);
+        setGameState(state);
+        // 左側プレイヤーの場合は設定画面を表示
+        if (side === "left") {
+          setShowSettings(true);
+        }
+        if (controllerRef.current) {
+          controllerRef.current.setPlayerSide(side);
+          controllerRef.current.updateGameState(state);
+        }
+      },
+      onGameState: (state) => {
+        setGameState(state);
+        if (controllerRef.current) {
+          controllerRef.current.updateGameState(state);
+        }
+      },
+      onChatMessages: (messages) => {
+        setChatMessages(messages);
+      },
+      onCountdown: (count) => {
+        setCountdown(count);
+      },
+      onGameStart: (state) => {
+        setCountdown(null);
+        setGameState(state);
+        if (controllerRef.current) {
+          controllerRef.current.updateGameState(state);
+        }
+      },
+      onGameOver: (result) => {
+        setIsGameOver(true);
+        setGameResult(result);
+        // ゲームコントローラーを停止
+        if (controllerRef.current) {
+          controllerRef.current.stop();
+        }
+      },
+    });
+
+    socketClientRef.current = socketClient;
+    socketClient.connect(wsUrl);
+
     return () => {
-      game.disconnect();
+      socketClient.disconnect();
     };
-  }, [roomId]);
+  }, []);
 
-  // キーボード操作（パドル移動）
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (!game.playerSide || game.gameState.status !== 'playing') return;
+  // Canvasとゲームコントローラーの初期化
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !socketClientRef.current) return;
 
-    const paddle = game.playerSide === 'left' 
-      ? game.gameState.paddleLeft 
-      : game.gameState.paddleRight;
+    const controller = new PongController(
+      canvas,
+      gameState,
+      socketClientRef.current,
+    );
 
-    let newY = paddle.y;
-    const moveSpeed = PADDLE.MOVE_SPEED;
+    controllerRef.current = controller;
+    controller.start();
 
-    // キー判定
-    if ((event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W') && paddle.y > 0) {
-      newY = Math.max(0, paddle.y - moveSpeed);
-    } else if (
-      (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') && 
-      paddle.y < 600 - paddle.height
-    ) {
-      newY = Math.min(600 - paddle.height, paddle.y + moveSpeed);
+    if (playerSide) {
+      controller.setPlayerSide(playerSide);
     }
 
-    // 位置変更があった場合のみ送信
-    if (newY !== paddle.y) {
-      game.sendPaddleMove(newY);
+    return () => {
+      controller.stop();
+    };
+  }, [canvasRef.current, socketClientRef.current]);
+
+  // チャット送信ハンドラ
+  const sendChat = () => {
+    if (chatInput.trim() && playerSide && socketClientRef.current) {
+      socketClientRef.current.sendChatMessage(
+        playerSide === "left" ? "プレイヤー1" : "プレイヤー2",
+        chatInput,
+      );
+      setChatInput("");
     }
   };
 
-  // チャット送信
-  const handleChatSend = (message: string) => {
-    const playerName = game.playerSide === 'left' ? 'プレイヤー1' : 'プレイヤー2';
-    game.sendChatMessage(playerName, message);
+  // ゲーム中断ハンドラ
+  const handleSurrender = () => {
+    setShowSurrenderConfirm(true);
   };
+
+  // 中断確認ダイアログでの「はい」クリック時
+  const confirmSurrender = () => {
+    if (socketClientRef.current) {
+      socketClientRef.current.sendSurrenderMessage();
+      socketClientRef.current.disconnect();
+      router.push("/");
+    }
+    setShowSurrenderConfirm(false);
+  };
+
+  // 中断確認ダイアログでの「いいえ」クリック時
+  const cancelSurrender = () => {
+    setShowSurrenderConfirm(false);
+  };
+
+  // 設定変更ハンドラ
+  const handleSettingChange = (setting: keyof GameSettings, value: number) => {
+    setGameSettings((prev) => ({
+      ...prev,
+      [setting]: value,
+    }));
+  };
+
+  // 設定確定ハンドラ
+  const confirmSettings = () => {
+    setSettingsConfirmed(true);
+    setShowSettings(false);
+
+    if (socketClientRef.current) {
+      socketClientRef.current.sendGameSettings(gameSettings);
+    }
+  };
+
+  // ホーム画面に戻るハンドラ
+  const handleBackToHome = () => {
+    if (socketClientRef.current) {
+      socketClientRef.current.disconnect();
+    }
+    router.push("/");
+  };
+
+  // ゲーム状態に基づく表示判定
+  const isWaiting = gameState.status === 'waiting';
+  const isCountdown = gameState.status === 'countdown';
+  const isPlaying = gameState.status === 'playing';
+  const isFinished = gameState.status === 'finished';
 
   return (
     <div className={styles.container}>
-      {/* エラー表示 */}
-      {game.errorState.hasError && (
-        <div className="fixed top-4 right-4 bg-red-600 text-white p-4 rounded-lg z-50">
-          <p>{game.errorState.errorMessage}</p>
-          <button 
-            onClick={game.clearError}
-            className="mt-2 text-sm underline"
-          >
-            閉じる
-          </button>
-        </div>
-      )}
-
-      {/* 中断ボタン（ゲーム中のみ表示） */}
-      {game.controlState.isPlaying && !game.controlState.isGameOver && (
+      {/* 中断ボタン - ゲーム終了時は非表示 */}
+      {!isFinished && (
         <div className={styles.surrenderButtonContainer}>
-          <button 
-            onClick={() => game.setShowSurrenderDialog(true)}
-            className={styles.surrenderButton}
-          >
+          <button onClick={handleSurrender} className={styles.surrenderButton}>
             中断
           </button>
         </div>
       )}
 
-      {/* メインゲーム画面 */}
-      <GameCanvas
-        canvasRef={game.canvasRef}
-        countdownValue={game.controlState.isCountdown ? game.controlState.countdownValue : undefined}
-        onKeyDown={handleKeyDown}
-      />
-
-      {/* 待機画面 */}
-      {game.controlState.isWaitingForPlayer && (
-        <WaitingScreen 
-          playerSide={game.playerSide}
-          roomId={roomId}
+      <div className={styles.canvasContainer}>
+        <canvas
+          ref={canvasRef}
+          width={CANVAS.WIDTH}
+          height={CANVAS.HEIGHT}
+          className={styles.canvas}
         />
-      )}
 
-      {/* ゲーム設定モーダル */}
-      <GameSettings
-        isOpen={game.uiState.showSettings && !game.uiState.settingsConfirmed}
-        onConfirm={game.sendGameSettings}
-        onCancel={() => game.setShowSettings(false)}
-      />
+        {countdown !== null && !isFinished && (
+          <div className={styles.countdownOverlay}>
+            <div className={styles.countdownText}>{countdown}</div>
+          </div>
+        )}
+
+        {/* ゲーム結果画面 - ゲーム終了時のみ表示 */}
+        {isFinished && gameResult && (
+          <div className={styles.gameOverOverlay}>
+            <div className={styles.gameOverContent}>
+              <h2 className={styles.resultTitle}>
+                {playerSide === gameResult.winner ? "WIN" : "LOSE"}
+              </h2>
+              <div className={styles.finalScore}>
+                <span>{gameResult.finalScore.left}</span>
+                <span className={styles.scoreSeparator}>-</span>
+                <span>{gameResult.finalScore.right}</span>
+              </div>
+              {gameResult.message && (
+                <p className={styles.resultMessage}>{gameResult.message}</p>
+              )}
+              <button onClick={handleBackToHome} className={styles.backButton}>
+                戻る
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ゲーム設定モーダル */}
+        {showSettings && !settingsConfirmed && (
+          <div className={styles.settingsOverlay}>
+            <div className={styles.settingsModal}>
+              <h2 className={styles.settingsTitle}>
+                ゲーム内容を設定してください。
+              </h2>
+
+              <div className={styles.settingItem}>
+                <label htmlFor="ballSpeed" className={styles.settingLabel}>
+                  スピード:
+                </label>
+                <select
+                  id="ballSpeed"
+                  value={gameSettings.ballSpeed}
+                  onChange={(e) =>
+                    handleSettingChange("ballSpeed", parseInt(e.target.value))
+                  }
+                  className={styles.settingSelect}
+                >
+                  {Array.from({ length: 10 }, (_, i) => i + 1).map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.settingItem}>
+                <label htmlFor="winningScore" className={styles.settingLabel}>
+                  勝利得点:
+                </label>
+                <select
+                  id="winningScore"
+                  value={gameSettings.winningScore}
+                  onChange={(e) =>
+                    handleSettingChange(
+                      "winningScore",
+                      parseInt(e.target.value),
+                    )
+                  }
+                  className={styles.settingSelect}
+                >
+                  {GAME.WINNING_SCORE_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={confirmSettings}
+                className={styles.settingsButton}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* 中断確認ダイアログ */}
-      <SurrenderDialog
-        isOpen={game.uiState.showSurrenderDialog}
-        onConfirm={game.sendSurrender}
-        onCancel={() => game.setShowSurrenderDialog(false)}
-      />
-
-      {/* ゲーム結果画面 */}
-      {game.controlState.isGameOver && game.gameResult && (
-        <GameResult
-          result={game.gameResult}
-          playerSide={game.playerSide}
-          onBackToHome={game.handleBackToHome}
-        />
+      {showSurrenderConfirm && (
+        <div className={styles.dialogOverlay}>
+          <div className={styles.dialog}>
+            <p className={styles.dialogText}>
+              中断するとあなたは不戦敗となります。ゲームを中断しますか？
+            </p>
+            <div className={styles.dialogButtons}>
+              <button
+                onClick={confirmSurrender}
+                className={`${styles.dialogButton} ${styles.confirmButton}`}
+              >
+                はい
+              </button>
+              <button
+                onClick={cancelSurrender}
+                className={`${styles.dialogButton} ${styles.cancelButton}`}
+              >
+                いいえ
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* チャット（ゲーム終了時は非表示） */}
-      {!game.controlState.isGameOver && (
-        <GameChat
-          messages={game.chatMessages}
-          currentInput={game.uiState.chatInput}
-          onInputChange={game.setChatInput}
-          onSendMessage={handleChatSend}
-          disabled={!game.controlState.isConnected}
-        />
+      {/* チャット部分 - ゲーム終了時は非表示 */}
+      {!isFinished && (
+        <div className={styles.chatContainer}>
+          <div className={styles.chatMessages}>
+            {chatMessages.map((chat, index) => (
+              <div key={index} className="mb-2">
+                <span className="font-bold">{chat.name}:</span>
+                <span className="ml-2">{chat.message}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className={styles.chatInputContainer}>
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                // チャット入力中のwキーとsキーのイベント伝播を停止
+                if (
+                  e.key === "w" ||
+                  e.key === "W" ||
+                  e.key === "s" ||
+                  e.key === "S"
+                ) {
+                  e.stopPropagation();
+                }
+                // Enterキーが押されたらチャット送信
+                if (e.key === "Enter") {
+                  sendChat();
+                }
+              }}
+              className={styles.chatInput}
+              placeholder="メッセージを入力..."
+            />
+            <button
+              onClick={sendChat}
+              type="button"
+              className={styles.sendButton}
+            >
+              送信
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
-}
+};
+
+export default PongGame;
