@@ -65,6 +65,9 @@ const PongGame = () => {
   const [isGameOver, setIsGameOver] = useState(false);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
 
+  // playerSideを保持するRef（GameOver時にnullにならないよう）
+  const playerSideRef = useRef<PlayerSide>(null);
+
   const router = useRouter();
   const controllerRef = useRef<PongController | null>(null);
   const socketClientRef = useRef<PongSocketClient | null>(null);
@@ -75,6 +78,7 @@ const PongGame = () => {
     const socketClient = new PongSocketClient({
       onInit: (side, state) => {
         setPlayerSide(side);
+        playerSideRef.current = side; // Refにも保存
         setGameState(state);
         // 左側プレイヤーの場合は設定画面を表示
         if (side === "left") {
@@ -107,6 +111,14 @@ const PongGame = () => {
       onGameOver: (result) => {
         setIsGameOver(true);
         setGameResult(result);
+        
+        // ゲーム状態も手動で'finished'に更新
+        setGameState(prevState => ({
+          ...prevState,
+          status: 'finished',
+          winner: result.winner
+        }));
+        
         // ゲームコントローラーを停止
         if (controllerRef.current) {
           controllerRef.current.stop();
@@ -208,10 +220,18 @@ const PongGame = () => {
   const isPlaying = gameState.status === 'playing';
   const isFinished = gameState.status === 'finished';
 
+  // WIN/LOSE判定
+  const getResultText = () => {
+    if (!gameResult) return "";
+    const currentPlayerSide = playerSideRef.current || playerSide;
+    const isWinner = currentPlayerSide === gameResult.winner;
+    return isWinner ? "WIN" : "LOSE";
+  };
+
   return (
     <div className={styles.container}>
       {/* 中断ボタン - ゲーム終了時は非表示 */}
-      {!isFinished && (
+      {!isFinished && !isGameOver && (
         <div className={styles.surrenderButtonContainer}>
           <button onClick={handleSurrender} className={styles.surrenderButton}>
             中断
@@ -227,18 +247,18 @@ const PongGame = () => {
           className={styles.canvas}
         />
 
-        {countdown !== null && !isFinished && (
+        {countdown !== null && !isFinished && !isGameOver && (
           <div className={styles.countdownOverlay}>
             <div className={styles.countdownText}>{countdown}</div>
           </div>
         )}
 
-        {/* ゲーム結果画面 - ゲーム終了時のみ表示 */}
-        {isFinished && gameResult && (
+        {/* ゲーム結果画面 */}
+        {(isFinished || isGameOver) && gameResult && (
           <div className={styles.gameOverOverlay}>
             <div className={styles.gameOverContent}>
               <h2 className={styles.resultTitle}>
-                {playerSide === gameResult.winner ? "WIN" : "LOSE"}
+                {getResultText()}
               </h2>
               <div className={styles.finalScore}>
                 <span>{gameResult.finalScore.left}</span>
@@ -343,7 +363,7 @@ const PongGame = () => {
       )}
 
       {/* チャット部分 - ゲーム終了時は非表示 */}
-      {!isFinished && (
+      {!isFinished && !isGameOver && (
         <div className={styles.chatContainer}>
           <div className={styles.chatMessages}>
             {chatMessages.map((chat, index) => (

@@ -107,20 +107,23 @@ export class GameHandlerService {
       this.room.state.score.right = this.room.state.winningScore;
     }
 
-    // 降参したプレイヤーに敗北通知を送信
-    const surrenderingPlayer = this.room.players[playerSide];
-    if (surrenderingPlayer) {
-      const surrenderMessage = JSON.stringify({
-        type: "gameOver",
-        winner: winner,
-        reason: "surrender",
-        message: "あなたは中断して敗北しました。",
-        leftScore: this.room.state.score.left,
-        rightScore: this.room.state.score.right,
-      });
-
-      surrenderingPlayer.send(surrenderMessage);
-    }
+    // // 降参したプレイヤーに敗北通知を送信
+    // const surrenderingPlayer = this.room.players[playerSide];
+    // if (surrenderingPlayer) {
+    //   const surrenderMessage = JSON.stringify({
+    //     type: "gameOver",
+    //     result: {
+    //       winner: winner,
+    //       finalScore: {
+    //         left: this.room.state.score.left,
+    //         right: this.room.state.score.right,
+    //       },
+    //       reason: "surrender",
+    //       message: "あなたは中断して敗北しました。",
+    //     }
+    //   });
+    //   surrenderingPlayer.send(surrenderMessage);
+    // }
 
     // 勝利したプレイヤーに勝利通知を送信
     const victorPlayer = this.room.players[winner];
