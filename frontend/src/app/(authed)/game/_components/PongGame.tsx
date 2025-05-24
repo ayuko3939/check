@@ -129,12 +129,23 @@ const PongGame = () => {
     };
   }, [playerSide, gameState]);
 
-  // ゲーム状態判定
+  // ======== 背景制御ロジック（新規追加） ========
   const isGameActive = gameState.status === 'playing' || gameState.status === 'countdown';
   const isGameFinished = gameState.status === 'finished' || isGameOver;
 
+  // 背景を暗くする条件：ゲーム中以外
+  const shouldDarkenBackground = 
+    (showSettings && !settingsConfirmed) || 
+    showSurrenderConfirm || 
+    isGameFinished;
+
   return (
     <div className={styles.container}>
+      {/* ======== 背景暗化オーバーレイ（新規追加） ======== */}
+      {shouldDarkenBackground && (
+        <div className={styles.backgroundOverlay} />
+      )}
+
       <GameCanvas 
         canvasRef={canvasRef}
         countdown={countdown}

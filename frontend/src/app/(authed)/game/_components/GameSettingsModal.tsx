@@ -20,8 +20,8 @@ const GameSettingsModal = ({ show, settings, onSettingsChange, onConfirm }: Game
   };
 
   return (
-    <div className={styles.settingsOverlay}>
-      <div className={styles.settingsModal}>
+    <div className={styles.dialogOverlay}>
+      <div className={styles.dialog}>
         <h2 className={styles.settingsTitle}>
           ゲーム内容を設定してください。
         </h2>
@@ -62,7 +62,7 @@ const GameSettingsModal = ({ show, settings, onSettingsChange, onConfirm }: Game
           </select>
         </div>
 
-        <button onClick={onConfirm} className={styles.settingsButton}>
+        <button onClick={onConfirm} className={styles.dialogButton}>
           OK
         </button>
       </div>
