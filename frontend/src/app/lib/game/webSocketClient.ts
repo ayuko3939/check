@@ -1,12 +1,12 @@
 import type {
   ChatMessage,
+  ClientMessage,
   GameResult,
   GameSettings,
   GameState,
   PlayerSide,
-  ClientMessage,
   ServerMessage,
-} from "../../../types/shared/types";
+} from "@ft-transcendence/shared";
 
 export interface WebSocketHandlers {
   onInit: (side: PlayerSide, gameState: GameState) => void;
@@ -15,6 +15,7 @@ export interface WebSocketHandlers {
   onCountdown: (count: number) => void;
   onGameStart: (gameState: GameState) => void;
   onGameOver: (result: GameResult) => void;
+  onWaitingForPlayer: () => void;
 }
 
 export class PongSocketClient {
@@ -25,7 +26,7 @@ export class PongSocketClient {
     this.handlers = handlers;
   }
 
-  public connect(url: string): void {
+  public connect(url: string, sessionToken?: string): void {
     let wsUrl = url;
     if (url.startsWith("/")) {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -36,6 +37,11 @@ export class PongSocketClient {
 
     this.ws.onopen = () => {
       console.log("WebSocket接続完了");
+
+      // 認証情報を送信
+      if (sessionToken) {
+        this.sendAuthMessage(sessionToken);
+      }
     };
 
     this.ws.onmessage = (event) => {
@@ -69,10 +75,11 @@ export class PongSocketClient {
     });
   }
 
-  public sendPaddleMove(y: number): void {
+  public sendPaddleMove(y: number, playerSide?: PlayerSide): void {
     this.sendMessage({
       type: "paddleMove",
       y,
+      playerSide,
     });
   }
 
@@ -88,6 +95,17 @@ export class PongSocketClient {
     this.sendMessage({
       type: "surrender",
     });
+  }
+
+  private sendAuthMessage(sessionToken: string): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: "auth",
+          sessionToken: sessionToken,
+        }),
+      );
+    }
   }
 
   private sendMessage(message: ClientMessage): void {
@@ -115,6 +133,9 @@ export class PongSocketClient {
         break;
       case "chatUpdate":
         this.handlers.onChatMessages(data.messages);
+        break;
+      case "waitingForPlayer":
+        this.handlers.onWaitingForPlayer();
         break;
     }
   }

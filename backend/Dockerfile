@@ -2,12 +2,13 @@ FROM node:22-slim AS builder
 
 RUN npm install -g pnpm
 
+WORKDIR /shared
+COPY ./shared .
+RUN pnpm i && pnpm build
+
 WORKDIR /app
-
 COPY ./backend/package.json .
-
 RUN pnpm install
-
 COPY ./backend /app
 
 RUN pnpm build

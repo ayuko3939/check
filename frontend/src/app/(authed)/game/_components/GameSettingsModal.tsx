@@ -1,5 +1,6 @@
-import type { GameSettings } from "../../../../types/shared/types";
-import { GAME } from "../../../../types/shared/constants";
+import type { GameSettings } from "@ft-transcendence/shared";
+import { GAME } from "@ft-transcendence/shared";
+
 import styles from "./game.module.css";
 
 interface GameSettingsModalProps {
@@ -9,7 +10,12 @@ interface GameSettingsModalProps {
   onConfirm: () => void;
 }
 
-const GameSettingsModal = ({ show, settings, onSettingsChange, onConfirm }: GameSettingsModalProps) => {
+const GameSettingsModal = ({
+  show,
+  settings,
+  onSettingsChange,
+  onConfirm,
+}: GameSettingsModalProps) => {
   if (!show) return null;
 
   const handleChange = (key: keyof GameSettings, value: number) => {
@@ -20,11 +26,9 @@ const GameSettingsModal = ({ show, settings, onSettingsChange, onConfirm }: Game
   };
 
   return (
-    <div className={styles.dialogOverlay}>
-      <div className={styles.dialog}>
-        <h2 className={styles.settingsTitle}>
-          ゲーム内容を設定してください。
-        </h2>
+    <div className={styles.overlay}>
+      <div className={styles.settingsModal}>
+        <h2 className={styles.settingsTitle}>ゲーム内容を設定してください。</h2>
 
         <div className={styles.settingItem}>
           <label htmlFor="ballSpeed" className={styles.settingLabel}>
@@ -33,7 +37,9 @@ const GameSettingsModal = ({ show, settings, onSettingsChange, onConfirm }: Game
           <select
             id="ballSpeed"
             value={settings.ballSpeed}
-            onChange={(e) => handleChange("ballSpeed", parseInt(e.target.value))}
+            onChange={(e) =>
+              handleChange("ballSpeed", parseInt(e.target.value))
+            }
             className={styles.settingSelect}
           >
             {Array.from({ length: 10 }, (_, i) => i + 1).map((value) => (
@@ -51,7 +57,9 @@ const GameSettingsModal = ({ show, settings, onSettingsChange, onConfirm }: Game
           <select
             id="winningScore"
             value={settings.winningScore}
-            onChange={(e) => handleChange("winningScore", parseInt(e.target.value))}
+            onChange={(e) =>
+              handleChange("winningScore", parseInt(e.target.value))
+            }
             className={styles.settingSelect}
           >
             {GAME.WINNING_SCORE_OPTIONS.map((value) => (
@@ -62,7 +70,7 @@ const GameSettingsModal = ({ show, settings, onSettingsChange, onConfirm }: Game
           </select>
         </div>
 
-        <button onClick={onConfirm} className={styles.dialogButton}>
+        <button onClick={onConfirm} className={styles.settingsButton}>
           OK
         </button>
       </div>

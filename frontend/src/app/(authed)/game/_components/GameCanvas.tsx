@@ -1,21 +1,21 @@
-import { CANVAS } from "../../../../types/shared/constants";
+import type { GameState } from "@ft-transcendence/shared";
+import { CANVAS } from "@ft-transcendence/shared";
+
 import styles from "./game.module.css";
 
 interface GameCanvasProps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  gameState: GameState;
   countdown: number | null;
-  isGameFinished: boolean;
   onSurrender: () => void;
 }
 
-const GameCanvas = ({ 
-  canvasRef, 
-  countdown, 
-  isGameFinished, 
-  onSurrender 
+const GameCanvas = ({
+  canvasRef,
+  gameState,
+  countdown,
+  onSurrender,
 }: GameCanvasProps) => {
-  const shouldShowCountdown = countdown !== null && !isGameFinished;
-
   return (
     <>
       {/* 中断ボタン */}
@@ -34,9 +34,18 @@ const GameCanvas = ({
         />
 
         {/* カウントダウン表示 */}
-        {shouldShowCountdown && (
-          <div className={styles.countdownOverlay}>
+        {gameState.status === "countdown" && countdown !== null && (
+          <div className={styles.overlay}>
             <div className={styles.countdownText}>{countdown}</div>
+          </div>
+        )}
+
+        {/* 待機メッセージ表示 */}
+        {gameState.status === "waiting" && (
+          <div className={styles.overlay}>
+            <div className={styles.waitingText}>
+              相手プレイヤーを待っています。
+            </div>
           </div>
         )}
       </div>

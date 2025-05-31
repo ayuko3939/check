@@ -1,6 +1,6 @@
 import type { PongSocketClient } from "@/lib/game/webSocketClient";
-import type { GameState, PlayerSide } from "../../../types/shared/types";
-import { PADDLE } from "../../../types/shared/constants";
+import type { GameState, PlayerSide } from "@ft-transcendence/shared";
+import { PADDLE } from "@ft-transcendence/shared";
 
 import { PongRenderer } from "./gameRenderer";
 
@@ -48,7 +48,7 @@ export class PongController {
   };
 
   private handleKeyPress = (e: KeyboardEvent): void => {
-    if (!this.playerSide) return;
+    if (!this.playerSide || this.gameState.status === "finished") return;
 
     const speed = PADDLE.MOVE_SPEED;
     let paddleMove = false;

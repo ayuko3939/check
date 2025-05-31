@@ -1,5 +1,5 @@
 import type { NextAuthOptions } from "next-auth";
-import { authenticateUser, updateSession } from "@/api/auth/users";
+import { authenticateUser, getProvider, updateSession } from "@/api/auth/users";
 import { db } from "@/api/db";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import * as jwt from "next-auth/jwt";
@@ -47,14 +47,21 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
+      if (!url || url.trim() === "") return `${baseUrl}/dashboard`;
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      if (new URL(url).origin === baseUrl) return "/dashboard";
+      try {
+        if (new URL(url).origin === baseUrl) return `${baseUrl}/dashboard`;
+      } catch (error) {
+        console.error("Invalid URL in redirect callback:", error);
+        return `${baseUrl}/dashboard`;
+      }
       return baseUrl;
     },
 
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id;
+        session.user.provider = (await getProvider(user.id)) ?? "credentials";
       }
       return session;
     },

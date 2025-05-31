@@ -37,7 +37,21 @@ export default function DashboardPage() {
             className="cyber-button"
             onClick={() => router.push("/game")}
           >
-            ゲームを始める
+            オンライン対戦
+          </button>
+          <button
+            type="button"
+            className="cyber-button"
+            onClick={() => router.push("/local-game")}
+          >
+            ローカル対戦
+          </button>
+          <button
+            type="button"
+            className="cyber-button"
+            onClick={() => router.push("/tournament")}
+          >
+            トーナメント
           </button>
         </div>
       </div>

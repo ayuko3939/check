@@ -1,7 +1,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 import { db } from "@/api/db";
+import { account, session, user, userPassword } from "@ft-transcendence/shared";
 import { eq } from "drizzle-orm";
-import { account, session, user, userPassword } from "drizzle/schema";
 
 import { hashPassword, verifyPassword } from "./utils";
 
@@ -137,4 +137,16 @@ export async function authenticateUser(
     return null;
   }
   return hituser;
+}
+
+export async function getProvider(userId: string): Promise<string | null> {
+  const accounts = await db
+    .select()
+    .from(account)
+    .where(eq(account.userId, userId))
+    .limit(1);
+  if (accounts.length === 0) {
+    return null;
+  }
+  return accounts[0].provider || null;
 }

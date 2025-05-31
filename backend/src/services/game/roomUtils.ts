@@ -1,16 +1,28 @@
 import { GameEngine } from "../../services/game/GameEngine";
+import { saveGameResult } from "./saveGameResult";
 import { v4 as uuidv4 } from "uuid";
 import type { GameRoom } from "../../types/game";
-import type { GameState, GameSettings } from "../../types/shared/types";
-import { CANVAS, BALL, PADDLE, GAME } from "../../types/shared/constants";
+import type { GameState, GameSettings, GameType } from "@ft-transcendence/shared";
+import { CANVAS, BALL, PADDLE, GAME } from "@ft-transcendence/shared";
 
-export function createGameRoom(): GameRoom {
+/**
+ * トーナメントマッチのゲームルーム管理用の型
+ */
+export interface TournamentGameInfo {
+  roomId: string;
+  room: GameRoom;
+  player1Id: string;
+  player2Id: string;
+}
+
+export function createGameRoom(gameType: GameType = "online"): GameRoom {
   const defaultBallSpeed = BALL.DEFAULT_SPEED;
   const defaultWinningScore = GAME.DEFAULT_WINNING_SCORE;
 
   return {
     id: uuidv4(),
     players: {},
+    userIds: {},
     state: {
       ball: {
         x: CANVAS.WIDTH / 2,
@@ -32,9 +44,10 @@ export function createGameRoom(): GameRoom {
         height: PADDLE.HEIGHT,
       },
       score: { left: 0, right: 0 },
-      status: 'waiting',
+      status: "connecting",
       winner: null,
       winningScore: defaultWinningScore,
+      gameType: gameType,
     },
     chats: [],
     settings: {
@@ -49,7 +62,7 @@ export function createGameRoom(): GameRoom {
 export function startGameCountdown(room: GameRoom) {
   let countdown = GAME.COUNTDOWN_SECONDS;
 
-  room.state.status = 'countdown';
+  room.state.status = "countdown";
 
   const countdownInterval = setInterval(() => {
     if (room?.players?.left && room?.players?.right) {
@@ -86,7 +99,7 @@ export function startGame(room: GameRoom) {
     radius: BALL.RADIUS,
   };
 
-  room.state.status = 'playing';
+  room.state.status = "playing";
 
   const gameStartMessage = JSON.stringify({
     type: "gameStart",
@@ -98,7 +111,11 @@ export function startGame(room: GameRoom) {
 
   const gameEngine = new GameEngine(room.state, room.settings);
   const gameInterval = setInterval(() => {
-    if (room.state.status === 'playing' && room.players.left && room.players.right) {
+    if (
+      room.state.status === "playing" &&
+      room.players.left &&
+      room.players.right
+    ) {
       gameEngine.update();
 
       const stateMessage = JSON.stringify({
@@ -109,7 +126,7 @@ export function startGame(room: GameRoom) {
       room.players.left.send(stateMessage);
       room.players.right.send(stateMessage);
 
-      if ((room.state.status as 'waiting' | 'countdown' | 'playing' | 'finished') === 'finished') {
+      if (room.state.status === "finished") {
         handleGameOver(room);
       }
     } else {
@@ -122,12 +139,33 @@ export function startGame(room: GameRoom) {
 
 export function checkAndStartGame(room: GameRoom): void {
   if (room.players.left && room.players.right && room.leftPlayerReady) {
-    const startMessage = JSON.stringify({
-      type: "gameStart",
-      state: room.state,
+    // 両プレイヤーがいて設定完了 → カウントダウン開始
+    startGameCountdown(room);
+  } else if (room.leftPlayerReady && !room.players.right) {
+    // leftが設定完了したがrightがいない → leftを待機状態に
+    room.state.status = "waiting";
+    const waitingMessage = JSON.stringify({
+      type: "waitingForPlayer",
     });
-    room.players.left.send(startMessage);
-    room.players.right.send(startMessage);
+    if (room.players.left) {
+      room.players.left.send(waitingMessage);
+    }
+  } else if (room.players.right && !room.leftPlayerReady) {
+    // rightがいるがleftが設定待ち → rightを待機状態に
+    room.state.status = "waiting";
+    const waitingMessage = JSON.stringify({
+      type: "waitingForPlayer",
+    });
+    room.players.right.send(waitingMessage);
+  }
+}
+
+/**
+ * トーナメント用のゲーム開始チェック（設定不要）
+ */
+export function checkAndStartTournamentGame(room: GameRoom): void {
+  if (room.players.left && room.players.right) {
+    // 両プレイヤーがいれば即座にカウントダウン開始
     startGameCountdown(room);
   }
 }
@@ -141,6 +179,9 @@ function handleGameOver(room: GameRoom) {
         left: room.state.score.left,
         right: room.state.score.right,
       },
+      message: room.state.gameType === "tournament" 
+        ? "トーナメント戦が終了しました" 
+        : undefined,
     },
   });
 
@@ -152,7 +193,12 @@ function handleGameOver(room: GameRoom) {
     room.timers.game = undefined;
   }
 
-  room.state.status = 'waiting';
+  room.state.status = "finished";
+
+  // ローカル対戦ではDB保存をスキップ
+  if (room.state.gameType !== "local") {
+    saveGameResult(room, "completed");
+  }
 }
 
 export function findAvailableRoom(gameRooms: Map<string, GameRoom>): {
@@ -160,13 +206,39 @@ export function findAvailableRoom(gameRooms: Map<string, GameRoom>): {
   room: GameRoom;
 } {
   for (const [id, room] of gameRooms.entries()) {
+    // finished状態のルームは除外
+    if (room.state.status === "finished") {
+      continue;
+    }
     if (!room.players.left || !room.players.right) {
       return { roomId: id, room };
     }
   }
 
   const newRoomId = uuidv4();
-  const newRoom = createGameRoom();
+  const newRoom = createGameRoom("online");
   gameRooms.set(newRoomId, newRoom);
   return { roomId: newRoomId, room: newRoom };
+}
+
+/**
+ * トーナメント専用のゲームルームを作成
+ */
+export function createTournamentGameRoom(
+  tournamentId: string,
+  matchId: string,
+  gameRooms: Map<string, GameRoom>
+): { roomId: string; room: GameRoom } {
+  const roomId = uuidv4();
+  const room = createGameRoom("tournament");
+  
+  // トーナメント情報を設定
+  room.tournamentId = tournamentId;
+  room.tournamentMatchId = matchId;
+  
+  // トーナメントでは設定済みですぐ開始
+  room.leftPlayerReady = true;
+  
+  gameRooms.set(roomId, room);
+  return { roomId, room };
 }

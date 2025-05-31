@@ -1,5 +1,5 @@
 import type { GameRoom } from "../../types/game";
-import type { PlayerSide } from "../../types/shared/types";
+import type { PlayerSide } from "@ft-transcendence/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { WebSocket } from "@fastify/websocket";
 
@@ -15,7 +15,7 @@ export const gameRooms = new Map<string, GameRoom>();
 export function handleGameConnection(
   connection: WebSocket,
   req: FastifyRequest,
-  fastify: FastifyInstance
+  fastify: FastifyInstance,
 ) {
   const { roomId, room } = findAvailableRoom(gameRooms);
   assignPlayerToRoom(connection, req, fastify, room, roomId);
@@ -24,7 +24,7 @@ export function handleGameConnection(
 export function handleGameConnectionWithRoomId(
   connection: WebSocket,
   req: FastifyRequest,
-  fastify: FastifyInstance
+  fastify: FastifyInstance,
 ) {
   const { roomId } = req.params as { roomId: string };
   if (!roomId) {
@@ -33,7 +33,7 @@ export function handleGameConnectionWithRoomId(
   }
   let room = gameRooms.get(roomId);
   if (!room) {
-    room = createGameRoom();
+    room = createGameRoom("online");
     gameRooms.set(roomId, room);
   }
   if (room.players.left && room.players.right) {
@@ -48,7 +48,7 @@ function assignPlayerToRoom(
   req: FastifyRequest,
   fastify: FastifyInstance,
   room: GameRoom,
-  roomId: string
+  roomId: string,
 ) {
   let playerSide: PlayerSide;
 
@@ -58,12 +58,11 @@ function assignPlayerToRoom(
   } else if (!room.players.right) {
     room.players.right = connection;
     playerSide = "right";
-    checkAndStartGame(room);
   } else {
     connection.close(1008, "Room is full");
     return;
   }
-  
+
   const gameHandlerService = new GameHandlerService(room);
 
   connection.on("message", (message: Buffer) => {
@@ -74,12 +73,9 @@ function assignPlayerToRoom(
     gameHandlerService.handlePlayerDisconnect(playerSide, roomId, gameRooms);
   });
 
-  connection.send(
-    JSON.stringify({
-      type: "init",
-      side: playerSide,
-      state: room.state,
-      roomId: roomId,
-    })
+  // 認証を待つため、ここではinitメッセージを送信しない
+  // 認証完了後にGameHandlerService.handleAuthMessage()で送信される
+  console.log(
+    `プレイヤー ${playerSide} がルーム ${roomId} に接続しました（認証待ち）`,
   );
 }
