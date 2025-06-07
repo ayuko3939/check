@@ -22,14 +22,16 @@ services:
       - DB_FILE_NAME=${DB_FILE_NAME}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - BACKEND_URL=http://backend:3001
+      - BACKEND_WS_URL=ws://backend:3001
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - BACKEND_WS_URL=ws://backend:3001/game
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_ENDPOINT=${AWS_ENDPOINT}
       - AWS_REGION=ap-northeast-1
       - UPLOAD_BUCKET_NAME=${UPLOAD_BUCKET_NAME}
+      - LOG_FILE_PATH=/logs/frontend.log
     volumes:
       - logdir:/logs
       - dbdir:/var/lib/db
@@ -48,9 +50,10 @@ services:
       - DB_FILE_DIR=/var/lib/db
       - DB_FILE_NAME=${DB_FILE_NAME}
       - FRONTEND_URL="http://localhost:3000"
+      - LOG_FILE_PATH=/logs/backend.log
     command: ["/app/dist/index.js"]
     volumes:
-      - logdir:/app/logs
+      - logdir:/logs
       - dbdir:/var/lib/db
     depends_on:
       database-init:
@@ -123,11 +126,10 @@ services:
       retries: 120
     env_file:
       - .env
+    networks:
+      - app-network
 
   elastic-search:
-    depends_on:
-      setup:
-        condition: service_healthy
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
     labels:
       co.elastic.logs/module: elasticsearch
@@ -166,6 +168,8 @@ services:
       interval: 10s
       timeout: 10s
       retries: 120
+    networks:
+      - app-network
 
   kibana:
     depends_on:
@@ -197,6 +201,31 @@ services:
       interval: 10s
       timeout: 10s
       retries: 120
+    networks:
+      - app-network
+
+  log-archiver:
+    image: ft_transcendence_logarchiver:${COMMIT_HASH:-latest}
+    build:
+      context: ./internal/archive
+      dockerfile: Dockerfile
+    container_name: ft_transcendence_log_archiver
+    environment:
+      - ELASTIC_USER=elastic
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ELASTIC_HOST=elastic-search:9200
+    volumes:
+      - certs:/certs:ro
+      - archive-data:/archive
+    networks:
+      - app-network
+    depends_on:
+      elastic-search:
+        condition: service_healthy
+    restart: "no"
+    mem_limit: 128m
+    labels:
+      - "co.elastic.logs/enabled=false"
 
   logstash:
     depends_on:
@@ -218,6 +247,24 @@ services:
       - ELASTIC_USER=elastic
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - ELASTIC_HOSTS=https://elastic-search:9200
+    networks:
+      - app-network
+
+  kibana-init:
+    image: alpine:latest
+    depends_on:
+      kibana:
+        condition: service_healthy
+    environment:
+      - ELASTIC_USER=elastic
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    volumes:
+      - ./internal/settings/kibana/kibana_init.sh:/kibana_init.sh
+      - ./internal/settings/kibana/frontend-dashboard.ndjson:/kibana-config/frontend-dashboard.ndjson
+    command: ["/bin/sh", "-c", "apk add --no-cache curl && /bin/sh /kibana_init.sh"]
+    networks:
+      - app-network
+    restart: "no"
 
 volumes:
   logdir:
@@ -235,6 +282,8 @@ volumes:
   nginx_ssl:
     driver: local
   miniodir:
+    driver: local
+  archive-data:
     driver: local
 
 networks:

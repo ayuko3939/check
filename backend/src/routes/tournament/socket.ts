@@ -140,7 +140,9 @@ async function sendTournamentUpdate(
       type: "tournamentUpdate",
       tournament,
     });
-
+    console.log(
+      `トーナメント ${tournamentId} の状態を更新: ${JSON.stringify(tournament)}`,
+    );
     broadcastToTournament(tournamentId, updateMessage);
   } catch (error) {
     console.error("トーナメント状態更新送信エラー:", error);

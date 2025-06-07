@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.userPasswordRelations = exports.tournamentParticipantsRelations = exports.tournamentsRelations = exports.tournamentMatchesRelations = exports.sessionRelations = exports.gamesRelations = exports.playersRelations = exports.authenticatorRelations = exports.userRelations = exports.accountRelations = void 0;
+exports.tournamentParticipantsRelations = exports.tournamentsRelations = exports.tournamentMatchesRelations = exports.gamesRelations = exports.playersRelations = exports.userPasswordRelations = exports.sessionRelations = exports.authenticatorRelations = exports.userRelations = exports.accountRelations = void 0;
 const relations_1 = require("drizzle-orm/relations");
 const schema_1 = require("./schema");
 exports.accountRelations = (0, relations_1.relations)(schema_1.account, ({ one }) => ({
@@ -12,8 +12,9 @@ exports.accountRelations = (0, relations_1.relations)(schema_1.account, ({ one }
 exports.userRelations = (0, relations_1.relations)(schema_1.user, ({ many }) => ({
     accounts: many(schema_1.account),
     authenticators: many(schema_1.authenticator),
-    players: many(schema_1.players),
     sessions: many(schema_1.session),
+    userPasswords: many(schema_1.userPassword),
+    players: many(schema_1.players),
     tournamentMatches_winnerId: many(schema_1.tournamentMatches, {
         relationName: "tournamentMatches_winnerId_user_id"
     }),
@@ -30,11 +31,22 @@ exports.userRelations = (0, relations_1.relations)(schema_1.user, ({ many }) => 
     tournaments_creatorId: many(schema_1.tournaments, {
         relationName: "tournaments_creatorId_user_id"
     }),
-    userPasswords: many(schema_1.userPassword),
 }));
 exports.authenticatorRelations = (0, relations_1.relations)(schema_1.authenticator, ({ one }) => ({
     user: one(schema_1.user, {
         fields: [schema_1.authenticator.userId],
+        references: [schema_1.user.id]
+    }),
+}));
+exports.sessionRelations = (0, relations_1.relations)(schema_1.session, ({ one }) => ({
+    user: one(schema_1.user, {
+        fields: [schema_1.session.userId],
+        references: [schema_1.user.id]
+    }),
+}));
+exports.userPasswordRelations = (0, relations_1.relations)(schema_1.userPassword, ({ one }) => ({
+    user: one(schema_1.user, {
+        fields: [schema_1.userPassword.userId],
         references: [schema_1.user.id]
     }),
 }));
@@ -51,12 +63,6 @@ exports.playersRelations = (0, relations_1.relations)(schema_1.players, ({ one }
 exports.gamesRelations = (0, relations_1.relations)(schema_1.games, ({ many }) => ({
     players: many(schema_1.players),
     tournamentMatches: many(schema_1.tournamentMatches),
-}));
-exports.sessionRelations = (0, relations_1.relations)(schema_1.session, ({ one }) => ({
-    user: one(schema_1.user, {
-        fields: [schema_1.session.userId],
-        references: [schema_1.user.id]
-    }),
 }));
 exports.tournamentMatchesRelations = (0, relations_1.relations)(schema_1.tournamentMatches, ({ one }) => ({
     game: one(schema_1.games, {
@@ -105,11 +111,5 @@ exports.tournamentParticipantsRelations = (0, relations_1.relations)(schema_1.to
     tournament: one(schema_1.tournaments, {
         fields: [schema_1.tournamentParticipants.tournamentId],
         references: [schema_1.tournaments.id]
-    }),
-}));
-exports.userPasswordRelations = (0, relations_1.relations)(schema_1.userPassword, ({ one }) => ({
-    user: one(schema_1.user, {
-        fields: [schema_1.userPassword.userId],
-        references: [schema_1.user.id]
     }),
 }));

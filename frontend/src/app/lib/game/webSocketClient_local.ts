@@ -29,7 +29,7 @@ export class LocalPongSocketClient {
 
   public connect(sessionToken?: string): void {
     // ローカル対戦専用のWebSocketプロキシを使用
-    const wsUrl = "/api/ws-proxy-local";
+    const wsUrl = "/ws/game-local";
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const fullWsUrl = `${protocol}//${window.location.host}${wsUrl}`;
 
@@ -58,7 +58,7 @@ export class LocalPongSocketClient {
       if (event.code !== 1000) {
         console.log("ローカル対戦WebSocket切断されました");
         clientLogWarn("ローカル対戦WebSocket接続が切断されました", {
-          code: event.code.toString()
+          code: event.code.toString(),
         });
       }
     };

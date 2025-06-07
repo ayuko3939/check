@@ -57,5 +57,10 @@ export interface StartTournamentRequest {
 
 export interface TournamentStatus {
   tournament: TournamentWithDetails;
-  currentUserStatus?: "not_joined" | "joined" | "eliminated" | "active" | "winner";
+  currentUserStatus?:
+    | "not_joined"
+    | "joined"
+    | "eliminated"
+    | "active"
+    | "winner";
 }

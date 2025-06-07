@@ -228,11 +228,7 @@ export class TournamentService {
     // 試合をデータベースに保存
     if (matches.length > 0) {
       await db.insert(tournamentMatches).values(matches);
-
-      // 各試合用のゲームルームを作成
-      for (const match of matches) {
-        this.createMatchGameRoom(tournamentId, match.id);
-      }
+      // ゲームルームの作成は実際にプレイヤーが接続した時に行う
     }
   }
 
@@ -269,7 +265,7 @@ export class TournamentService {
         status: tournamentParticipants.status,
         eliminatedRound: tournamentParticipants.eliminatedRound,
         joinedAt: tournamentParticipants.joinedAt,
-        userName: user.name,
+        userName: user.displayName,
       })
       .from(tournamentParticipants)
       .innerJoin(user, eq(tournamentParticipants.userId, user.id))
@@ -347,7 +343,7 @@ export class TournamentService {
         status: tournamentParticipants.status,
         eliminatedRound: tournamentParticipants.eliminatedRound,
         joinedAt: tournamentParticipants.joinedAt,
-        userName: user.name,
+        userName: user.displayName,
       })
       .from(tournamentParticipants)
       .innerJoin(user, eq(tournamentParticipants.userId, user.id))
@@ -517,6 +513,82 @@ export class TournamentService {
         nextRound,
       );
     }
+  }
+
+  /**
+   * マッチ詳細を取得
+   */
+  async getMatchDetails(matchId: string): Promise<{
+    id: string;
+    tournamentId: string;
+    round: number;
+    matchNumber: number;
+    player1Id: string;
+    player2Id: string;
+    player1Name: string;
+    player2Name: string;
+    status: "pending" | "in_progress" | "completed";
+    gameRoomId?: string;
+  } | null> {
+    // マッチ情報を取得
+    const matchResult = await db
+      .select({
+        id: tournamentMatches.id,
+        tournamentId: tournamentMatches.tournamentId,
+        round: tournamentMatches.round,
+        matchNumber: tournamentMatches.matchNumber,
+        player1Id: tournamentMatches.player1Id,
+        player2Id: tournamentMatches.player2Id,
+        status: tournamentMatches.status,
+      })
+      .from(tournamentMatches)
+      .where(eq(tournamentMatches.id, matchId))
+      .limit(1);
+
+    if (matchResult.length === 0) {
+      return null;
+    }
+
+    const match = matchResult[0];
+
+    // プレイヤー名を取得
+    const [player1, player2] = await Promise.all([
+      db
+        .select({ displayName: user.displayName })
+        .from(user)
+        .where(eq(user.id, match.player1Id))
+        .limit(1),
+      db
+        .select({ displayName: user.displayName })
+        .from(user)
+        .where(eq(user.id, match.player2Id))
+        .limit(1),
+    ]);
+
+    return {
+      id: match.id,
+      tournamentId: match.tournamentId,
+      round: match.round,
+      matchNumber: match.matchNumber,
+      player1Id: match.player1Id,
+      player2Id: match.player2Id,
+      player1Name: player1[0]?.displayName || "Unknown Player",
+      player2Name: player2[0]?.displayName || "Unknown Player",
+      status: match.status as "pending" | "in_progress" | "completed",
+    };
+  }
+
+  /**
+   * 試合状態を更新
+   */
+  async updateMatchStatus(
+    matchId: string,
+    status: "pending" | "in_progress" | "completed",
+  ): Promise<void> {
+    await db
+      .update(tournamentMatches)
+      .set({ status })
+      .where(eq(tournamentMatches.id, matchId));
   }
 
   /**

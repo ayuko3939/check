@@ -9,17 +9,21 @@ import type {
 } from "@ft-transcendence/shared";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  clientLogInfo,
+  logButtonClick,
+  logUserAction,
+} from "@/lib/clientLogger";
 import { LocalPongController } from "@/lib/game/gameController_local";
 import { LocalPongSocketClient } from "@/lib/game/webSocketClient_local";
 import { BALL, CANVAS, GAME, PADDLE } from "@ft-transcendence/shared";
 import { useSession } from "next-auth/react";
-import { clientLogInfo, logUserAction, logButtonClick } from "@/lib/clientLogger";
 
-import LocalGameCanvas from "./GameCanvas_local";
-import GameSettingsModal from "../../game/_components/GameSettingsModal";
-import GameResultModal from "../../game/_components/GameResultModal";
 import ConfirmDialog from "../../game/_components/ConfirmDialog";
 import styles from "../../game/_components/game.module.css";
+import GameResultModal from "../../game/_components/GameResultModal";
+import GameSettingsModal from "../../game/_components/GameSettingsModal";
+import LocalGameCanvas from "./GameCanvas_local";
 
 const initialGameState: GameState = {
   ball: {
@@ -109,7 +113,7 @@ const LocalPongGame = () => {
           status: "finished",
           winner: result.winner,
         }));
-        
+
         const finalScore = `${result.finalScore.left}-${result.finalScore.right}`;
         logUserAction(`ローカルゲーム終了 (${finalScore})`, userId);
       },
@@ -223,8 +227,10 @@ const LocalPongGame = () => {
 
       {/* ローカル対戦用の操作説明 */}
       <div className="mt-4 text-center text-white">
-        <p className="text-sm mb-2">操作方法</p>
-        <p className="text-xs">プレイヤー1（左）: W/S キー | プレイヤー2（右）: ↑/↓ キー</p>
+        <p className="mb-2 text-sm">操作方法</p>
+        <p className="text-xs">
+          プレイヤー1（左）: W/S キー | プレイヤー2（右）: ↑/↓ キー
+        </p>
       </div>
     </div>
   );

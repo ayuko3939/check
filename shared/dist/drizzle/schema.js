@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verificationToken = exports.user = exports.userPassword = exports.tournaments = exports.tournamentParticipants = exports.tournamentMatches = exports.session = exports.players = exports.games = exports.authenticator = exports.account = void 0;
+exports.user = exports.tournaments = exports.tournamentParticipants = exports.tournamentMatches = exports.players = exports.games = exports.verificationToken = exports.userPassword = exports.session = exports.authenticator = exports.account = void 0;
 const sqlite_core_1 = require("drizzle-orm/sqlite-core");
 const drizzle_orm_1 = require("drizzle-orm");
 exports.account = (0, sqlite_core_1.sqliteTable)("account", {
@@ -31,6 +31,24 @@ exports.authenticator = (0, sqlite_core_1.sqliteTable)("authenticator", {
     (0, sqlite_core_1.uniqueIndex)("authenticator_credentialID_unique").on(table.credentialId),
     (0, sqlite_core_1.primaryKey)({ columns: [table.credentialId, table.userId], name: "authenticator_credentialID_userId_pk" })
 ]);
+exports.session = (0, sqlite_core_1.sqliteTable)("session", {
+    sessionToken: (0, sqlite_core_1.text)().primaryKey().notNull(),
+    userId: (0, sqlite_core_1.text)().notNull().references(() => exports.user.id, { onDelete: "cascade" }),
+    expires: (0, sqlite_core_1.integer)().notNull(),
+});
+exports.userPassword = (0, sqlite_core_1.sqliteTable)("user_password", {
+    userId: (0, sqlite_core_1.text)("user_id").primaryKey().notNull().references(() => exports.user.id, { onDelete: "cascade" }),
+    passwordHash: (0, sqlite_core_1.text)("password_hash").notNull(),
+    createdAt: (0, sqlite_core_1.integer)("created_at").default((0, drizzle_orm_1.sql) `(CURRENT_TIMESTAMP)`).notNull(),
+    updatedAt: (0, sqlite_core_1.integer)("updated_at").default((0, drizzle_orm_1.sql) `(CURRENT_TIMESTAMP)`).notNull(),
+});
+exports.verificationToken = (0, sqlite_core_1.sqliteTable)("verificationToken", {
+    identifier: (0, sqlite_core_1.text)().notNull(),
+    token: (0, sqlite_core_1.text)().notNull(),
+    expires: (0, sqlite_core_1.integer)().notNull(),
+}, (table) => [
+    (0, sqlite_core_1.primaryKey)({ columns: [table.identifier, table.token], name: "verificationToken_identifier_token_pk" })
+]);
 exports.games = (0, sqlite_core_1.sqliteTable)("games", {
     id: (0, sqlite_core_1.text)().primaryKey().notNull(),
     startedAt: (0, sqlite_core_1.integer)("started_at").notNull(),
@@ -54,11 +72,6 @@ exports.players = (0, sqlite_core_1.sqliteTable)("players", {
 }, (table) => [
     (0, sqlite_core_1.uniqueIndex)("players_game_side_unique").on(table.gameId, table.side),
 ]);
-exports.session = (0, sqlite_core_1.sqliteTable)("session", {
-    sessionToken: (0, sqlite_core_1.text)().primaryKey().notNull(),
-    userId: (0, sqlite_core_1.text)().notNull().references(() => exports.user.id, { onDelete: "cascade" }),
-    expires: (0, sqlite_core_1.integer)().notNull(),
-});
 exports.tournamentMatches = (0, sqlite_core_1.sqliteTable)("tournament_matches", {
     id: (0, sqlite_core_1.text)().primaryKey().notNull(),
     tournamentId: (0, sqlite_core_1.text)("tournament_id").notNull().references(() => exports.tournaments.id, { onDelete: "cascade" }),
@@ -95,25 +108,14 @@ exports.tournaments = (0, sqlite_core_1.sqliteTable)("tournaments", {
     startedAt: (0, sqlite_core_1.integer)("started_at"),
     endedAt: (0, sqlite_core_1.integer)("ended_at"),
 });
-exports.userPassword = (0, sqlite_core_1.sqliteTable)("user_password", {
-    userId: (0, sqlite_core_1.text)("user_id").primaryKey().notNull().references(() => exports.user.id, { onDelete: "cascade" }),
-    passwordHash: (0, sqlite_core_1.text)("password_hash").notNull(),
-    createdAt: (0, sqlite_core_1.integer)("created_at").default((0, drizzle_orm_1.sql) `(CURRENT_TIMESTAMP)`).notNull(),
-    updatedAt: (0, sqlite_core_1.integer)("updated_at").default((0, drizzle_orm_1.sql) `(CURRENT_TIMESTAMP)`).notNull(),
-});
 exports.user = (0, sqlite_core_1.sqliteTable)("user", {
     id: (0, sqlite_core_1.text)().primaryKey().notNull(),
-    name: (0, sqlite_core_1.text)(),
+    name: (0, sqlite_core_1.text)({ length: 17 }),
     email: (0, sqlite_core_1.text)(),
     emailVerified: (0, sqlite_core_1.integer)(),
     image: (0, sqlite_core_1.text)(),
+    lastActivity: (0, sqlite_core_1.integer)("last_activity"),
+    displayName: (0, sqlite_core_1.text)({ length: 17 }),
 }, (table) => [
     (0, sqlite_core_1.uniqueIndex)("user_email_unique").on(table.email),
-]);
-exports.verificationToken = (0, sqlite_core_1.sqliteTable)("verificationToken", {
-    identifier: (0, sqlite_core_1.text)().notNull(),
-    token: (0, sqlite_core_1.text)().notNull(),
-    expires: (0, sqlite_core_1.integer)().notNull(),
-}, (table) => [
-    (0, sqlite_core_1.primaryKey)({ columns: [table.identifier, table.token], name: "verificationToken_identifier_token_pk" })
 ]);

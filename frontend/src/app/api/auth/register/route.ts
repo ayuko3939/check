@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { createAccount, createUser, getUserByEmail } from "@/api/auth/users";
-import { logApiRequest, logApiError } from "@/lib/logger";
+import { logApiError, logApiRequest } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,6 +11,12 @@ export async function POST(req: NextRequest) {
       logApiRequest(req.method, req.nextUrl.pathname, 400);
       return NextResponse.json(
         { error: "必須項目が入力されていません" },
+        { status: 400 },
+      );
+    }
+    if (name.length < 2 || name.length > 17) {
+      return NextResponse.json(
+        { error: "名前は2文字以上17文字以下で入力してください" },
         { status: 400 },
       );
     }
@@ -50,7 +56,11 @@ export async function POST(req: NextRequest) {
     logApiRequest(req.method, req.nextUrl.pathname, 201, newUser.id);
     return NextResponse.json({ user: newUser }, { status: 201 });
   } catch (error) {
-    logApiError(req.method, req.nextUrl.pathname, error instanceof Error ? error : new Error(String(error)));
+    logApiError(
+      req.method,
+      req.nextUrl.pathname,
+      error instanceof Error ? error : new Error(String(error)),
+    );
     console.error("ユーザー登録エラー:", error);
     return NextResponse.json(
       { error: "ユーザー登録中にエラーが発生しました" },
